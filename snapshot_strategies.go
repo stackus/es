@@ -6,7 +6,7 @@ import (
 
 type (
 	SnapshotStrategy[K comparable] interface {
-		ShouldSnapshot(aggregate Aggregate[K]) bool
+		ShouldSnapshot(aggregate AggregateRoot[K]) bool
 	}
 
 	frequencySnapshotStrategy[K comparable] struct {
@@ -30,7 +30,7 @@ func NewFrequencySnapshotStrategy[K comparable](frequency int) SnapshotStrategy[
 	}
 }
 
-func (ss frequencySnapshotStrategy[K]) ShouldSnapshot(aggregate Aggregate[K]) bool {
+func (ss frequencySnapshotStrategy[K]) ShouldSnapshot(aggregate AggregateRoot[K]) bool {
 	return (aggregate.AggregateVersion()%ss.frequency)+len(aggregate.Changes()) >= ss.frequency
 }
 
@@ -43,7 +43,7 @@ func NewParticularChangesSnapshotStrategy[K comparable](changes []any) SnapshotS
 	}
 }
 
-func (ss particularChangesSnapshotStrategy[K]) ShouldSnapshot(aggregate Aggregate[K]) bool {
+func (ss particularChangesSnapshotStrategy[K]) ShouldSnapshot(aggregate AggregateRoot[K]) bool {
 	for _, change := range ss.changes {
 		t1 := reflect.TypeOf(change)
 		if t1.Kind() == reflect.Ptr {

@@ -17,8 +17,8 @@ type Event[K comparable] struct {
 }
 
 type EventRepository[K comparable] interface {
-	Load(ctx context.Context, aggregate Aggregate[K], hooks EventLoadHooks[K]) ([]Event[K], error)
-	Save(ctx context.Context, aggregate Aggregate[K], events []Event[K], hooks EventSaveHooks[K]) error
+	Load(ctx context.Context, aggregate AggregateRoot[K], hooks EventLoadHooks[K]) ([]Event[K], error)
+	Save(ctx context.Context, aggregate AggregateRoot[K], events []Event[K], hooks EventSaveHooks[K]) error
 }
 
 type eventStore[K comparable] struct {
@@ -38,7 +38,7 @@ func NewEventStore[K comparable](
 	}
 }
 
-func (s eventStore[K]) Load(ctx context.Context, aggregate Aggregate[K], hooks ...Hook[K]) error {
+func (s eventStore[K]) Load(ctx context.Context, aggregate AggregateRoot[K], hooks ...Hook[K]) error {
 	events, err := s.repository.Load(ctx, aggregate, Hooks[K](hooks))
 	if err != nil {
 		return err
@@ -60,7 +60,7 @@ func (s eventStore[K]) Load(ctx context.Context, aggregate Aggregate[K], hooks .
 	return nil
 }
 
-func (s eventStore[K]) Save(ctx context.Context, aggregate Aggregate[K], hooks ...Hook[K]) error {
+func (s eventStore[K]) Save(ctx context.Context, aggregate AggregateRoot[K], hooks ...Hook[K]) error {
 	changes := aggregate.Changes()
 
 	if len(changes) == 0 {

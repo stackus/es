@@ -68,8 +68,7 @@ func main() {
 	}
 
 	// Load the order from the store
-	order = NewOrder()
-	order.SetID(orderID)
+	order = NewOrder(orderID)
 	if err := store.Load(ctx, order); err != nil {
 		panic(err)
 	}
@@ -85,8 +84,7 @@ func main() {
 	}
 
 	// Load the order from the store; this time we will load from the snapshot
-	order = NewOrder()
-	order.SetID(orderID)
+	order = NewOrder(orderID)
 	if err := store.Load(ctx, order); err != nil {
 		panic(err)
 	}
@@ -107,8 +105,7 @@ func main() {
 	}
 
 	// Load the order from the store once more; this time we will load from the snapshot and events
-	order = NewOrder()
-	order.SetID(orderID)
+	order = NewOrder(orderID)
 	if err := store.Load(ctx, order); err != nil {
 		panic(err)
 	}

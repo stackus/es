@@ -185,7 +185,7 @@ func (s *eventSuite[K]) TestEventStore_Save() {
 	_ = record.UpdateTimestamp(time.Now())
 
 	var savedEvents []es.Event[K]
-	eventsSaveHook := es.EventsPostSaveHook(func(ctx context.Context, aggregate es.Aggregate[K], events []es.Event[K]) error {
+	eventsSaveHook := es.EventsPostSaveHook(func(ctx context.Context, aggregate es.AggregateRoot[K], events []es.Event[K]) error {
 		assert.Len(s.T(), events, 4)
 		assert.Equal(s.T(), record.AggregateID(), events[0].AggregateID)
 		assert.Equal(s.T(), record.AggregateType(), events[0].AggregateType)

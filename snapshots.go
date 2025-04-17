@@ -20,12 +20,12 @@ type (
 	SnapshotAggregate[K comparable] interface {
 		CreateSnapshot() any
 		ApplySnapshot(snapshot any) error
-		AggregateRoot[K]
+		Aggregate[K]
 	}
 
 	SnapshotRepository[K comparable] interface {
-		Load(ctx context.Context, aggregate Aggregate[K], hooks SnapshotLoadHooks[K]) (*Snapshot[K], error)
-		Save(ctx context.Context, aggregate Aggregate[K], snapshot Snapshot[K], hooks SnapshotSaveHooks[K]) error
+		Load(ctx context.Context, aggregate AggregateRoot[K], hooks SnapshotLoadHooks[K]) (*Snapshot[K], error)
+		Save(ctx context.Context, aggregate AggregateRoot[K], snapshot Snapshot[K], hooks SnapshotSaveHooks[K]) error
 	}
 
 	snapshotStore[K comparable] struct {
@@ -52,8 +52,8 @@ func NewSnapshotStore[K comparable](
 	}
 }
 
-func (s snapshotStore[K]) Load(ctx context.Context, aggregate Aggregate[K], hooks ...Hook[K]) error {
-	hook := EventsPreLoadHook[K](func(ctx context.Context, aggregate Aggregate[K]) error {
+func (s snapshotStore[K]) Load(ctx context.Context, aggregate AggregateRoot[K], hooks ...Hook[K]) error {
+	hook := EventsPreLoadHook[K](func(ctx context.Context, aggregate AggregateRoot[K]) error {
 		sa, ok := aggregate.(SnapshotAggregate[K])
 		if !ok {
 			return nil
@@ -73,7 +73,7 @@ func (s snapshotStore[K]) Load(ctx context.Context, aggregate Aggregate[K], hook
 			return err
 		}
 		sa.SetID(snapshot.AggregateID)
-		sa.setVersion(snapshot.AggregateVersion)
+		sa.SetVersion(snapshot.AggregateVersion)
 
 		return nil
 	})
@@ -81,8 +81,8 @@ func (s snapshotStore[K]) Load(ctx context.Context, aggregate Aggregate[K], hook
 	return s.eventStore.Load(ctx, aggregate, append([]Hook[K]{hook}, hooks...)...)
 }
 
-func (s snapshotStore[K]) Save(ctx context.Context, aggregate Aggregate[K], hooks ...Hook[K]) error {
-	hook := EventsPostSaveHook[K](func(ctx context.Context, aggregate Aggregate[K], events []Event[K]) error {
+func (s snapshotStore[K]) Save(ctx context.Context, aggregate AggregateRoot[K], hooks ...Hook[K]) error {
+	hook := EventsPostSaveHook[K](func(ctx context.Context, aggregate AggregateRoot[K], events []Event[K]) error {
 		sa, ok := aggregate.(SnapshotAggregate[K])
 		if !ok {
 			return nil

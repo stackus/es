@@ -18,7 +18,7 @@ func TestEventRepository_Load(t *testing.T) {
 	}
 	type args struct {
 		ctx       context.Context
-		aggregate es.Aggregate[string]
+		aggregate es.AggregateRoot[string]
 	}
 
 	// to simply testing the time values
@@ -50,7 +50,7 @@ func TestEventRepository_Load(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				aggregate: func() es.Aggregate[string] {
+				aggregate: func() es.AggregateRoot[string] {
 					a := NewRecord[string](&RecordString{})
 					a.SetID("1")
 
@@ -77,7 +77,7 @@ func TestEventRepository_Load(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				aggregate: func() es.Aggregate[string] {
+				aggregate: func() es.AggregateRoot[string] {
 					a := NewRecord[string](&RecordString{})
 					a.SetID("1")
 
@@ -107,7 +107,7 @@ func TestEventRepository_Load(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				aggregate: func() es.Aggregate[string] {
+				aggregate: func() es.AggregateRoot[string] {
 					a := NewRecord[string](&RecordString{})
 					_ = a.UpdateText("updated")
 					a.SetID("1")
@@ -138,7 +138,7 @@ func TestEventRepository_Load(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				aggregate: func() es.Aggregate[string] {
+				aggregate: func() es.AggregateRoot[string] {
 					a := NewRecord[string](&RecordString{})
 					a.SetID("1")
 
@@ -167,7 +167,7 @@ func TestEventRepository_Load(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				aggregate: func() es.Aggregate[string] {
+				aggregate: func() es.AggregateRoot[string] {
 					a := NewRecord[string](&RecordString{})
 					a.SetID("1")
 
@@ -211,7 +211,7 @@ func TestEventRepository_Save(t *testing.T) {
 	}
 	type args struct {
 		ctx       context.Context
-		aggregate es.Aggregate[string]
+		aggregate es.AggregateRoot[string]
 		events    []es.Event[string]
 	}
 
@@ -233,7 +233,7 @@ func TestEventRepository_Save(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				aggregate: func() es.Aggregate[string] {
+				aggregate: func() es.AggregateRoot[string] {
 					a := NewRecord[string](&RecordString{})
 					a.SetID("1")
 
@@ -259,7 +259,7 @@ func TestEventRepository_Save(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				aggregate: func() es.Aggregate[string] {
+				aggregate: func() es.AggregateRoot[string] {
 					a := NewRecord[string](&RecordString{})
 					a.SetID("1")
 
@@ -284,7 +284,7 @@ func TestEventRepository_Save(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				aggregate: func() es.Aggregate[string] {
+				aggregate: func() es.AggregateRoot[string] {
 					a := NewRecord[string](&RecordString{})
 					a.SetID("1")
 
@@ -310,7 +310,7 @@ func TestEventRepository_Save(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				aggregate: func() es.Aggregate[string] {
+				aggregate: func() es.AggregateRoot[string] {
 					a := NewRecord[string](&RecordString{})
 					a.SetID("1")
 

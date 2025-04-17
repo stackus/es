@@ -54,7 +54,7 @@ There are a few basic concepts to understand when using this library:
 // }
 
 type Order struct {
-	es.AggregateRoot[uuid.UUID] // embed the AggregateRoot
+	es.AggregateBase[uuid.UUID] // embed the AggregateBase
 	Total int
 }
 
@@ -109,7 +109,7 @@ type OrderCreated struct {
 // example of simple constructor
 func NewOrder(id *RootID) *Order {
 	return &Order{
-		AggregateRoot: es.NewAggregateRoot(id),
+		AggregateBase: es.NewAggregateBase(id),
 	}
 }
 

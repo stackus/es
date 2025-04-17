@@ -6,20 +6,21 @@ import (
 	"github.com/stackus/es"
 )
 
-var _ es.Aggregate[uuid.UUID] = (*Order)(nil)
+var _ es.AggregateRoot[uuid.UUID] = (*Order)(nil)
 var _ es.SnapshotAggregate[uuid.UUID] = (*Order)(nil)
 
 type Order struct {
-	es.AggregateRoot[uuid.UUID]
+	es.Aggregate[uuid.UUID]
 	CustomerID      uuid.UUID
 	Items           map[uuid.UUID]*Item
 	ShippingAddress ShippingAddress
 }
 
-func NewOrder() *Order {
+func NewOrder(id uuid.UUID) *Order {
+	oid := OrderID(id)
 	order := &Order{
-		AggregateRoot: es.NewAggregateRoot(&OrderID{}),
-		Items:         make(map[uuid.UUID]*Item),
+		Aggregate: es.NewAggregate(&oid),
+		Items:     make(map[uuid.UUID]*Item),
 	}
 
 	return order
@@ -28,7 +29,7 @@ func NewOrder() *Order {
 // --- Domain methods ---
 
 func CreateOrder(customerID uuid.UUID) (*Order, error) {
-	order := NewOrder()
+	order := NewOrder(uuid.Nil)
 
 	return order, order.TrackChange(order, &OrderCreated{
 		CustomerID: customerID,

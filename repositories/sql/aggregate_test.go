@@ -11,7 +11,7 @@ import (
 
 type (
 	Record[K comparable] struct {
-		es.AggregateRoot[K]
+		es.Aggregate[K]
 		Text      string
 		Number    int
 		Timestamp time.Time
@@ -105,7 +105,7 @@ func (o *RecordString) Set(id string) {
 	o.id = id
 }
 
-var _ es.Aggregate[any] = (*Record[any])(nil)
+var _ es.AggregateRoot[any] = (*Record[any])(nil)
 var _ es.SnapshotAggregate[any] = (*Record[any])(nil)
 
 var _ es.AggregateID[uuid.UUID] = (*RecordUUID)(nil)
@@ -114,7 +114,7 @@ var _ es.AggregateID[string] = (*RecordString)(nil)
 
 func NewRecord[K comparable](id es.AggregateID[K]) *Record[K] {
 	return &Record[K]{
-		AggregateRoot: es.NewAggregateRoot(id),
+		Aggregate: es.NewAggregate(id),
 	}
 }
 

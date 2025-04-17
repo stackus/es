@@ -16,7 +16,7 @@ func NewSnapshotRepository[K comparable]() es.SnapshotRepository[K] {
 	}
 }
 
-func (r *snapshotRepository[K]) Load(ctx context.Context, aggregate es.Aggregate[K], hooks es.SnapshotLoadHooks[K]) (*es.Snapshot[K], error) {
+func (r *snapshotRepository[K]) Load(ctx context.Context, aggregate es.AggregateRoot[K], hooks es.SnapshotLoadHooks[K]) (*es.Snapshot[K], error) {
 	if err := hooks.SnapshotPreLoad(ctx, aggregate); err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func (r *snapshotRepository[K]) Load(ctx context.Context, aggregate es.Aggregate
 	return &snapshot, nil
 }
 
-func (r *snapshotRepository[K]) Save(ctx context.Context, aggregate es.Aggregate[K], snapshot es.Snapshot[K], hooks es.SnapshotSaveHooks[K]) error {
+func (r *snapshotRepository[K]) Save(ctx context.Context, aggregate es.AggregateRoot[K], snapshot es.Snapshot[K], hooks es.SnapshotSaveHooks[K]) error {
 	if err := hooks.SnapshotPreSave(ctx, aggregate, snapshot); err != nil {
 		return err
 	}

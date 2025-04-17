@@ -24,7 +24,7 @@ WHERE aggregate_id = $1 AND aggregate_type = $2
 ORDER BY aggregate_version DESC
 LIMIT 1`
 
-func (r *snapshotRepository[K]) Load(ctx context.Context, aggregate es.Aggregate[K], hooks es.SnapshotLoadHooks[K]) (*es.Snapshot[K], error) {
+func (r *snapshotRepository[K]) Load(ctx context.Context, aggregate es.AggregateRoot[K], hooks es.SnapshotLoadHooks[K]) (*es.Snapshot[K], error) {
 	var snapshot es.Snapshot[K]
 	err := r.db.withTx(ctx, func(ctx context.Context, tx *sql.Tx) error {
 		// run preload hooks
@@ -55,7 +55,7 @@ func (r *snapshotRepository[K]) Load(ctx context.Context, aggregate es.Aggregate
 const saveSnapshotSQL = `INSERT INTO aggregate_snapshots (aggregate_id, aggregate_type, aggregate_version, snapshot_type, snapshot_data, created_at)
 VALUES ($1, $2, $3, $4, $5, $6)`
 
-func (r *snapshotRepository[K]) Save(ctx context.Context, aggregate es.Aggregate[K], snapshot es.Snapshot[K], hooks es.SnapshotSaveHooks[K]) error {
+func (r *snapshotRepository[K]) Save(ctx context.Context, aggregate es.AggregateRoot[K], snapshot es.Snapshot[K], hooks es.SnapshotSaveHooks[K]) error {
 	return r.db.withTx(ctx, func(ctx context.Context, tx *sql.Tx) error {
 		// run presave hooks
 		if err := hooks.SnapshotPreSave(ctx, aggregate, snapshot); err != nil {

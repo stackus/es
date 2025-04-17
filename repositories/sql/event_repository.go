@@ -25,7 +25,7 @@ FROM aggregate_events
 WHERE aggregate_id = $1 AND aggregate_type = $2 AND aggregate_version > $3
 ORDER BY aggregate_version ASC`
 
-func (r *eventRepository[K]) Load(ctx context.Context, aggregate es.Aggregate[K], hooks es.EventLoadHooks[K]) ([]es.Event[K], error) {
+func (r *eventRepository[K]) Load(ctx context.Context, aggregate es.AggregateRoot[K], hooks es.EventLoadHooks[K]) ([]es.Event[K], error) {
 	var events []es.Event[K]
 	err := r.db.withTx(ctx, func(ctx context.Context, tx *sql.Tx) error {
 		// run preload hooks
@@ -64,7 +64,7 @@ func (r *eventRepository[K]) Load(ctx context.Context, aggregate es.Aggregate[K]
 const saveEventsSQL = `INSERT INTO aggregate_events (aggregate_id, aggregate_type, aggregate_version, event_type, event_data, occurred_at)
 VALUES ($1, $2, $3, $4, $5, $6)`
 
-func (r *eventRepository[K]) Save(ctx context.Context, aggregate es.Aggregate[K], events []es.Event[K], hooks es.EventSaveHooks[K]) error {
+func (r *eventRepository[K]) Save(ctx context.Context, aggregate es.AggregateRoot[K], events []es.Event[K], hooks es.EventSaveHooks[K]) error {
 	return r.db.withTx(ctx, func(ctx context.Context, tx *sql.Tx) error {
 		// run presave hooks
 		if err := hooks.EventsPreSave(ctx, aggregate, events); err != nil {

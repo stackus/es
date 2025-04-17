@@ -16,7 +16,7 @@ func NewEventRepository[K comparable]() es.EventRepository[K] {
 	}
 }
 
-func (r *eventRepository[K]) Load(ctx context.Context, aggregate es.Aggregate[K], hooks es.EventLoadHooks[K]) ([]es.Event[K], error) {
+func (r *eventRepository[K]) Load(ctx context.Context, aggregate es.AggregateRoot[K], hooks es.EventLoadHooks[K]) ([]es.Event[K], error) {
 	if err := hooks.EventsPreLoad(ctx, aggregate); err != nil {
 		return nil, err
 	}
@@ -42,12 +42,6 @@ func (r *eventRepository[K]) Load(ctx context.Context, aggregate es.Aggregate[K]
 	case fromVersion > 0:
 		events = events[fromVersion:]
 	}
-	// if fromVersion > 0 {
-	// 	if fromVersion >= len(events) {
-	// 		return nil, nil
-	// 	}
-	// 	events = events[fromVersion:]
-	// }
 
 	if err := hooks.EventsPostLoad(ctx, aggregate, events); err != nil {
 		return nil, err
@@ -56,7 +50,7 @@ func (r *eventRepository[K]) Load(ctx context.Context, aggregate es.Aggregate[K]
 	return events, nil
 }
 
-func (r *eventRepository[K]) Save(ctx context.Context, aggregate es.Aggregate[K], events []es.Event[K], hooks es.EventSaveHooks[K]) error {
+func (r *eventRepository[K]) Save(ctx context.Context, aggregate es.AggregateRoot[K], events []es.Event[K], hooks es.EventSaveHooks[K]) error {
 	if err := hooks.EventsPreSave(ctx, aggregate, events); err != nil {
 		return err
 	}
