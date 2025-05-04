@@ -98,6 +98,14 @@ func (s *EventStore[K]) Save(ctx context.Context, aggregate AggregateRoot[K], ho
 	return nil
 }
 
+// WithRepository returns a new EventStore with the provided repository.
+func (s *EventStore[K]) WithRepository(repository EventRepository[K]) *EventStore[K] {
+	return &EventStore[K]{
+		repository:    repository,
+		eventAppliers: s.eventAppliers,
+	}
+}
+
 func (s *EventStore[K]) registerEventApplier(eventType string, applier eventApplier[K]) {
 	if s.eventAppliers == nil {
 		s.eventAppliers = make(map[string]eventApplier[K])

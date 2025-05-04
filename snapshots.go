@@ -112,6 +112,26 @@ func (s *SnapshotStore[K]) Save(ctx context.Context, aggregate AggregateRoot[K],
 	return s.eventStore.Save(ctx, aggregate, append(hooks, hook)...)
 }
 
+// WithRepository returns a new SnapshotStore with the provided SnapshotRepository.
+func (s *SnapshotStore[K]) WithRepository(repository SnapshotRepository[K]) *SnapshotStore[K] {
+	return &SnapshotStore[K]{
+		eventStore:       s.eventStore,
+		repository:       repository,
+		strategy:         s.strategy,
+		snapshotAppliers: s.snapshotAppliers,
+	}
+}
+
+// WithEventStore returns a new SnapshotStore with the provided EventStore.
+func (s *SnapshotStore[K]) WithEventStore(eventStore *EventStore[K]) *SnapshotStore[K] {
+	return &SnapshotStore[K]{
+		eventStore:       eventStore,
+		repository:       s.repository,
+		strategy:         s.strategy,
+		snapshotAppliers: s.snapshotAppliers,
+	}
+}
+
 func (s *SnapshotStore[K]) registerSnapshotApplier(snapshotType string, applier snapshotApplier[K]) {
 	s.snapshotAppliers[snapshotType] = applier
 }
