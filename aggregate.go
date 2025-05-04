@@ -27,6 +27,7 @@ type (
 		AggregateID() K
 		AggregateVersion() int
 		TrackChange(aggregate AggregateRoot[K], event EventPayload) error
+		TrackChanges(aggregate AggregateRoot[K], events ...EventPayload) error
 		Changes() []EventPayload
 		SetID(K)
 		SetVersion(int)
@@ -52,12 +53,23 @@ func (a *aggregate[K]) AggregateID() K          { return a.id.Get() }
 func (a *aggregate[K]) AggregateVersion() int   { return a.version }
 func (a *aggregate[K]) Changes() []EventPayload { return a.changes }
 func (a *aggregate[K]) TrackChange(aggregate AggregateRoot[K], event EventPayload) error {
+	return a.TrackChanges(aggregate, event)
+}
+func (a *aggregate[K]) TrackChanges(aggregate AggregateRoot[K], events ...EventPayload) error {
 	if !a.id.IsSet() {
 		a.SetID(a.id.New())
 	}
 
-	a.changes = append(a.changes, event)
-	return aggregate.ApplyChange(event)
+	if len(events) == 0 {
+		return nil
+	}
+	for _, event := range events {
+		if err := aggregate.ApplyChange(event); err != nil {
+			return err
+		}
+		a.changes = append(a.changes, event)
+	}
+	return nil
 }
 
 func (a *aggregate[K]) SetID(id K) {
