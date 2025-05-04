@@ -2,56 +2,61 @@ package es
 
 import (
 	"context"
+	"encoding/json"
 	"time"
-
-	"github.com/stackus/envelope"
 )
 
-type Event[K comparable] struct {
-	AggregateID      K
-	AggregateType    string
-	AggregateVersion int
-	EventType        string
-	EventData        []byte
-	OccurredAt       time.Time
-}
+type (
+	EventPayload interface {
+		Kind() string
+	}
 
-type EventRepository[K comparable] interface {
-	Load(ctx context.Context, aggregate AggregateRoot[K], hooks EventLoadHooks[K]) ([]Event[K], error)
-	Save(ctx context.Context, aggregate AggregateRoot[K], events []Event[K], hooks EventSaveHooks[K]) error
-}
+	Event[K comparable] struct {
+		AggregateID      K
+		AggregateType    string
+		AggregateVersion int
+		EventType        string
+		EventData        []byte
+		OccurredAt       time.Time
+	}
 
-type eventStore[K comparable] struct {
-	registry   envelope.Registry
-	repository EventRepository[K]
-}
+	EventRepository[K comparable] interface {
+		Load(ctx context.Context, aggregate AggregateRoot[K], hooks EventLoadHooks[K]) ([]Event[K], error)
+		Save(ctx context.Context, aggregate AggregateRoot[K], events []Event[K], hooks EventSaveHooks[K]) error
+	}
 
-var _ AggregateStore[any] = (*eventStore[any])(nil)
+	EventStore[K comparable] struct {
+		repository    EventRepository[K]
+		eventAppliers map[string]eventApplier[K]
+	}
+)
+
+var _ AggregateStore[any] = (*EventStore[any])(nil)
 
 func NewEventStore[K comparable](
-	registry envelope.Registry,
 	repository EventRepository[K],
-) AggregateStore[K] {
-	return &eventStore[K]{
-		registry:   registry,
-		repository: repository,
+) *EventStore[K] {
+	return &EventStore[K]{
+		repository:    repository,
+		eventAppliers: make(map[string]eventApplier[K]),
 	}
 }
 
-func (s eventStore[K]) Load(ctx context.Context, aggregate AggregateRoot[K], hooks ...Hook[K]) error {
+func (s *EventStore[K]) Load(ctx context.Context, aggregate AggregateRoot[K], hooks ...Hook[K]) error {
 	events, err := s.repository.Load(ctx, aggregate, Hooks[K](hooks))
 	if err != nil {
 		return err
 	}
 
 	for _, event := range events {
-		eEnv, err := s.registry.Deserialize(event.EventData)
-		if err != nil {
-			return err
-		}
-		err = aggregate.TrackChange(aggregate, eEnv.Payload())
-		if err != nil {
-			return err
+		if applier, ok := s.eventAppliers[event.EventType]; ok {
+			err = applier.applyChange(event, aggregate)
+			if err != nil {
+				return err
+			}
+			continue
+		} else {
+			return ErrUnregisteredEvent(event.EventType)
 		}
 	}
 
@@ -60,7 +65,7 @@ func (s eventStore[K]) Load(ctx context.Context, aggregate AggregateRoot[K], hoo
 	return nil
 }
 
-func (s eventStore[K]) Save(ctx context.Context, aggregate AggregateRoot[K], hooks ...Hook[K]) error {
+func (s *EventStore[K]) Save(ctx context.Context, aggregate AggregateRoot[K], hooks ...Hook[K]) error {
 	changes := aggregate.Changes()
 
 	if len(changes) == 0 {
@@ -70,7 +75,7 @@ func (s eventStore[K]) Save(ctx context.Context, aggregate AggregateRoot[K], hoo
 	events := make([]Event[K], 0, len(changes))
 
 	for i, change := range changes {
-		eEnv, err := s.registry.Serialize(change)
+		data, err := json.Marshal(change)
 		if err != nil {
 			return err
 		}
@@ -78,8 +83,8 @@ func (s eventStore[K]) Save(ctx context.Context, aggregate AggregateRoot[K], hoo
 			AggregateID:      aggregate.AggregateID(),
 			AggregateType:    aggregate.AggregateType(),
 			AggregateVersion: aggregate.AggregateVersion() + i + 1,
-			EventType:        eEnv.Key(),
-			EventData:        eEnv.Bytes(),
+			EventType:        change.Kind(),
+			EventData:        data,
 			OccurredAt:       time.Now(),
 		})
 	}
@@ -91,4 +96,29 @@ func (s eventStore[K]) Save(ctx context.Context, aggregate AggregateRoot[K], hoo
 	aggregate.commitChanges()
 
 	return nil
+}
+
+func (s *EventStore[K]) registerEventApplier(eventType string, applier eventApplier[K]) {
+	if s.eventAppliers == nil {
+		s.eventAppliers = make(map[string]eventApplier[K])
+	}
+	s.eventAppliers[eventType] = applier
+}
+
+type eventApplier[K comparable] interface {
+	applyChange(event Event[K], aggregate AggregateRoot[K]) error
+}
+
+type eventApplyWrapper[K comparable, T EventPayload] struct{}
+
+func (a *eventApplyWrapper[K, T]) applyChange(event Event[K], aggregate AggregateRoot[K]) error {
+	var payload T
+	if err := json.Unmarshal(event.EventData, &payload); err != nil {
+		return err
+	}
+	return aggregate.TrackChange(aggregate, payload)
+}
+
+func RegisterEvent[K comparable, T EventPayload](eventStore *EventStore[K], event T) {
+	eventStore.registerEventApplier(event.Kind(), &eventApplyWrapper[K, T]{})
 }

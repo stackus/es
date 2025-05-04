@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/stackus/envelope"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -25,7 +24,7 @@ type eventSuite[K comparable] struct {
 	cleanupFn func() error
 	db        *sql.DB
 	repo      es.EventRepository[K]
-	store     es.AggregateStore[K]
+	store     *es.EventStore[K]
 	idFactory func() es.AggregateID[K]
 	files     []string
 }
@@ -39,10 +38,13 @@ func (s *eventSuite[K]) SetupSuite() {
 	}
 	s.db = db
 	s.cleanupFn = cleanup
-	reg := envelope.NewRegistry()
-	err = registerTypes(reg)
 	s.repo = essql.NewEventRepository[K](s.db)
-	s.store = es.NewEventStore(reg, s.repo)
+	s.store = es.NewEventStore(s.repo)
+
+	es.RegisterEvent(s.store, &RecordCreated{})
+	es.RegisterEvent(s.store, &RecordTextUpdated{})
+	es.RegisterEvent(s.store, &RecordNumberUpdated{})
+	es.RegisterEvent(s.store, &RecordTimestampUpdated{})
 }
 
 func (s *eventSuite[K]) TearDownSuite() {

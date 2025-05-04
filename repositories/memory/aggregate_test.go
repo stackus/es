@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/stackus/envelope"
 
 	"github.com/stackus/es"
 )
@@ -46,6 +45,22 @@ type (
 	}
 )
 
+func (RecordCreated) Kind() string {
+	return "RecordCreated"
+}
+func (RecordTextUpdated) Kind() string {
+	return "RecordTextUpdated"
+}
+func (RecordNumberUpdated) Kind() string {
+	return "RecordNumberUpdated"
+}
+func (RecordTimestampUpdated) Kind() string {
+	return "RecordTimestampUpdated"
+}
+func (RecordSnapshot) Kind() string {
+	return "RecordSnapshot"
+}
+
 func (o *RecordString) New() string {
 	return uuid.New().String()
 }
@@ -69,7 +84,7 @@ var _ es.AggregateID[string] = (*RecordString)(nil)
 
 func NewRecord[K comparable](id es.AggregateID[K]) *Record[K] {
 	return &Record[K]{
-		AggregateBase: es.NewAggregate(id),
+		Aggregate: es.NewAggregate(id),
 	}
 }
 
@@ -105,7 +120,7 @@ func (r *Record[K]) AggregateType() string {
 	return "Record"
 }
 
-func (r *Record[K]) ApplyChange(event any) error {
+func (r *Record[K]) ApplyChange(event es.EventPayload) error {
 	switch e := event.(type) {
 	case *RecordCreated:
 		r.Text = e.Text
@@ -121,7 +136,7 @@ func (r *Record[K]) ApplyChange(event any) error {
 	return nil
 }
 
-func (r *Record[K]) CreateSnapshot() any {
+func (r *Record[K]) CreateSnapshot() es.SnapshotPayload {
 	return &RecordSnapshot{
 		Text:      r.Text,
 		Number:    r.Number,
@@ -129,7 +144,7 @@ func (r *Record[K]) CreateSnapshot() any {
 	}
 }
 
-func (r *Record[K]) ApplySnapshot(snapshot any) error {
+func (r *Record[K]) ApplySnapshot(snapshot es.SnapshotPayload) error {
 	switch s := snapshot.(type) {
 	case *RecordSnapshot:
 		r.Text = s.Text
@@ -139,12 +154,12 @@ func (r *Record[K]) ApplySnapshot(snapshot any) error {
 	return nil
 }
 
-func registerTypes(reg envelope.Registry) error {
-	return reg.Register(
-		RecordCreated{},
-		RecordTextUpdated{},
-		RecordNumberUpdated{},
-		RecordTimestampUpdated{},
-		RecordSnapshot{},
-	)
-}
+// func registerTypes(reg envelope.Registry) error {
+// 	return reg.Register(
+// 		RecordCreated{},
+// 		RecordTextUpdated{},
+// 		RecordNumberUpdated{},
+// 		RecordTimestampUpdated{},
+// 		RecordSnapshot{},
+// 	)
+// }

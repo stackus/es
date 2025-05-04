@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/stackus/envelope"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -25,7 +24,7 @@ type snapshotSuite[K comparable] struct {
 	cleanupFn func() error
 	db        *sql.DB
 	repo      es.SnapshotRepository[K]
-	store     es.AggregateStore[K]
+	store     *es.SnapshotStore[K]
 	idFactory func() es.AggregateID[K]
 	files     []string
 }
@@ -39,15 +38,19 @@ func (s *snapshotSuite[K]) SetupSuite() {
 	}
 	s.db = db
 	s.cleanupFn = cleanup
-	reg := envelope.NewRegistry()
-	err = registerTypes(reg)
 	s.repo = essql.NewSnapshotRepository[K](s.db)
+	eventStore := es.NewEventStore(essql.NewEventRepository[K](s.db))
+	es.RegisterEvent(eventStore, &RecordCreated{})
+	es.RegisterEvent(eventStore, &RecordTextUpdated{})
+	es.RegisterEvent(eventStore, &RecordNumberUpdated{})
+	es.RegisterEvent(eventStore, &RecordTimestampUpdated{})
 	s.store = es.NewSnapshotStore(
-		reg,
-		es.NewEventStore(reg, essql.NewEventRepository[K](s.db)),
+		eventStore,
 		s.repo,
 		es.NewFrequencySnapshotStrategy[K](2),
 	)
+
+	es.RegisterSnapshot(s.store, &RecordSnapshot{})
 }
 
 func (s *snapshotSuite[K]) TearDownSuite() {

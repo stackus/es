@@ -86,7 +86,7 @@ func (o *Order) AggregateType() string {
 	return "orders.Order"
 }
 
-func (o *Order) ApplyChange(event any) error {
+func (o *Order) ApplyChange(event es.EventPayload) error {
 	switch e := event.(type) {
 	case *OrderCreated:
 		o.CustomerID = e.CustomerID
@@ -122,7 +122,7 @@ func (o *Order) ApplyChange(event any) error {
 	return nil
 }
 
-func (o *Order) CreateSnapshot() any {
+func (o *Order) CreateSnapshot() es.SnapshotPayload {
 	items := make([]Item, 0, len(o.Items))
 	for _, item := range o.Items {
 		items = append(items, *item)
@@ -134,7 +134,7 @@ func (o *Order) CreateSnapshot() any {
 	}
 }
 
-func (o *Order) ApplySnapshot(snapshot any) error {
+func (o *Order) ApplySnapshot(snapshot es.SnapshotPayload) error {
 	switch s := snapshot.(type) {
 	case *OrderSnapshot:
 		o.CustomerID = s.CustomerID

@@ -15,7 +15,7 @@ type (
 	AggregateRoot[K comparable] interface {
 		Aggregate[K]
 		AggregateType() string
-		ApplyChange(event any) error
+		ApplyChange(event EventPayload) error
 	}
 
 	AggregateStore[K comparable] interface {
@@ -26,8 +26,8 @@ type (
 	Aggregate[K comparable] interface {
 		AggregateID() K
 		AggregateVersion() int
-		TrackChange(aggregate AggregateRoot[K], event any) error
-		Changes() []any
+		TrackChange(aggregate AggregateRoot[K], event EventPayload) error
+		Changes() []EventPayload
 		SetID(K)
 		SetVersion(int)
 		commitChanges()
@@ -36,7 +36,7 @@ type (
 	aggregate[K comparable] struct {
 		id      AggregateID[K]
 		version int
-		changes []any
+		changes []EventPayload
 	}
 )
 
@@ -44,14 +44,14 @@ func NewAggregate[K comparable](id AggregateID[K]) Aggregate[K] {
 	return &aggregate[K]{
 		id:      id,
 		version: 0,
-		changes: []any{},
+		changes: []EventPayload{},
 	}
 }
 
-func (a *aggregate[K]) AggregateID() K        { return a.id.Get() }
-func (a *aggregate[K]) AggregateVersion() int { return a.version }
-func (a *aggregate[K]) Changes() []any        { return a.changes }
-func (a *aggregate[K]) TrackChange(aggregate AggregateRoot[K], event any) error {
+func (a *aggregate[K]) AggregateID() K          { return a.id.Get() }
+func (a *aggregate[K]) AggregateVersion() int   { return a.version }
+func (a *aggregate[K]) Changes() []EventPayload { return a.changes }
+func (a *aggregate[K]) TrackChange(aggregate AggregateRoot[K], event EventPayload) error {
 	if !a.id.IsSet() {
 		a.SetID(a.id.New())
 	}
@@ -70,5 +70,5 @@ func (a *aggregate[K]) SetVersion(version int) { a.version = version }
 
 func (a *aggregate[K]) commitChanges() {
 	a.version += len(a.changes)
-	a.changes = make([]any, 0)
+	a.changes = make([]EventPayload, 0)
 }

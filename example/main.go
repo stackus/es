@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/stackus/envelope"
 
 	"github.com/stackus/es"
 	"github.com/stackus/es/repositories/memory"
@@ -14,37 +13,28 @@ import (
 func main() {
 	ctx := context.Background()
 
-	// Create a new registry using the envelope package
-	reg := envelope.NewRegistry()
-
-	// Register the events and snapshot used by the Order aggregate
-	if err := reg.Register(
-		// Register the events used by the Order aggregate
-		OrderCreated{},
-		OrderItemAdded{},
-		OrderItemRemoved{},
-		OrderItemQuantityIncreased{},
-		OrderItemQuantityDecreased{},
-		OrderShippingAddressSet{},
-		// Register the snapshot used by the Order aggregate
-		OrderSnapshot{},
-	); err != nil {
-		panic(err)
-	}
-
 	// Create a new AggregateStore with a memory-based EventRepository and SnapshotRepository
 	var store es.AggregateStore[uuid.UUID]
-	store = es.NewSnapshotStore[uuid.UUID](
-		reg,
-		es.NewEventStore[uuid.UUID](
-			reg,
-			memory.NewEventRepository[uuid.UUID](),
-		),
+	eventStore := es.NewEventStore[uuid.UUID](memory.NewEventRepository[uuid.UUID]())
+
+	// Register the events with the event store
+	es.RegisterEvent(eventStore, &OrderCreated{})
+	es.RegisterEvent(eventStore, &OrderItemAdded{})
+	es.RegisterEvent(eventStore, &OrderItemRemoved{})
+	es.RegisterEvent(eventStore, &OrderItemQuantityIncreased{})
+	es.RegisterEvent(eventStore, &OrderItemQuantityDecreased{})
+	es.RegisterEvent(eventStore, &OrderShippingAddressSet{})
+
+	snapshotStore := es.NewSnapshotStore[uuid.UUID](
+		eventStore,
 		memory.NewSnapshotRepository[uuid.UUID](),
 		es.NewFrequencySnapshotStrategy[uuid.UUID](4), // Create a snapshot every 4 events
 	)
+	// Register the snapshot with the snapshot store
+	es.RegisterSnapshot(snapshotStore, &OrderSnapshot{})
+
 	// Add a "logging" middleware to the store; we're simply printing to the console
-	store = NewLoggingAggregateStore(store)
+	store = NewLoggingAggregateStore(snapshotStore)
 
 	// Create a new Order aggregate (creates the aggregate and applies the OrderCreated event)
 	customerID := uuid.New()

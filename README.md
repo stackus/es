@@ -25,17 +25,6 @@ Event Sourcing library for Go, designed for building scalable, event-driven appl
 go get github.com/stackus/es
 ```
 
-You will need to also install the required [envelope](https://github.com/stackus/envelope) package:
-
-```sh
-go get github.com/stackus/envelope
-```
-
-Envelope provides the serialization and deserialization of events and snapshots in a way that after they have been deserialized,
-they can be used as the original type.
-
-> TODO: Make it less of a manual process to use envelope. Possible: Replace the uses with an Optional parameter in the `NewEventStore` and `NewSnapshotStore` functions.
-
 ## 📚 Usage
 
 There are a few basic concepts to understand when using this library:
@@ -50,7 +39,7 @@ There are a few basic concepts to understand when using this library:
 ```go
 // type Aggregate[K comparable] interface {
 // 	AggregateType() string
-// 	ApplyChange(event any) error
+// 	ApplyChange(event es.EventPayload) error
 // }
 
 type Order struct {
@@ -62,7 +51,7 @@ type Order struct {
 func (o *Order) AggregateType() string { return "Order" }
 
 // implement the ApplyChange method
-func (o *Order) ApplyChange(event any) error {
+func (o *Order) ApplyChange(event es.EventPayload) error {
 	switch e := event.(type) {
 	case *OrderCreated:
 		o.Total = e.Total
@@ -95,12 +84,12 @@ There are tests and examples in this repository that show the usage of `string` 
 > TODO: Move docs for the ID before the Aggregate? It seems like it would be more logical to explain the ID before the Aggregate.
 
 ### 3. Define Events
-
+A simple Go struct with exported fields and a `Kind() string` method will do just fine:
 ```go
-// a simple Go struct with exported fields will do just fine
 type OrderCreated struct {
 	Total   int
 }
+func (o *OrderCreated) Kind() string { return "OrderCreated" }
 ```
 
 ### 4. Create a Constructor or Factory Function
@@ -141,17 +130,15 @@ The changes are applied to the aggregate with the previously seen `ApplyChange(e
 repository := memory.NewEventRepository[uuid.UUID]()
 ```
 
-#### b. All events that you want to store must be registered with a registry:
-
-```go
-reg := envelope.NewRegistry()
-_ = reg.Register(OrderCreated{})
-```
-
-#### c. Create an instance of the event store:
+#### b. Create an instance of the event store:
 
 ```go
 eventStore := es.NewEventStore(reg, repository)
+```
+#### c. All events that you want to store must be registered with the store:
+```go
+es.RegisterEvent(eventStore, &OrderCreated{})
+// register more events ...
 ```
 
 ### 6. Loading and Saving Events
@@ -208,28 +195,29 @@ Snapshots are a way to optimize the loading of an aggregate by storing the state
 Using Snapshots is entirely optional, but can be invaluable when you have aggregates with a large number of events.
 
 ### 1. Define a Snapshot
-
+Like the events, a snapshot is a simple Go struct with exported fields and a `Kind() string` method.
 ```go
 type OrderSnapshot struct {
 	Total int
 }
+func (o *OrderSnapshot) Kind() string { return "OrderSnapshot" }
 ```
 
 ### 2. Add the required methods to your Aggregate
 
 ```go
 // type SnapshotAggregate[K comparable] interface {
-// 	CreateSnapshot() any
-//	ApplySnapshot(snapshot any) error
+// 	CreateSnapshot() es.SnapshotPayload
+//	ApplySnapshot(snapshot es.SnapshotPayload) error
 // }
 
-func (o *Order) CreateSnapshot() any {
+func (o *Order) CreateSnapshot() es.SnapshotPayload {
 	return &OrderSnapshot{
 		Total: o.Total,
 	}
 }
 
-func (o *Order) ApplySnapshot(snapshot any) error {
+func (o *Order) ApplySnapshot(snapshot es.SnapshotPayload) error {
 	switch s := snapshot.(type) {
 	case *OrderSnapshot:
 		o.Total = s.Total
@@ -247,24 +235,22 @@ func (o *Order) ApplySnapshot(snapshot any) error {
 snapshotRepository := memory.NewSnapshotRepository[uuid.UUID]()
 ```
 
-#### b. Register the snapshot type(s) with the envelope registry:
-
-```go
-_ = reg.Register(OrderSnapshot{})
-```
-
-#### c. Create an instance of the snapshot store:
+#### b. Create an instance of the snapshot store:
 
 ```go
 snapshotStore := es.NewSnapshotStore(
-	reg,
-	snapshotRepository, 
 	eventStore, // we will use the event store we created earlier to save events
+	snapshotRepository, 
 	es.NewFrequencySnapshotStrategy(10), // create a new snapshot every 10 events
 )
 ```
-
 > There are other strategies available, such as `es.NewParticularChangesSnapshotStrategy(changes...)`, which creates a new snapshot when a particular change has occurred. Of course, you can also create your own strategy by implementing the `es.SnapshotStrategy` interface.
+
+#### c. Register the snapshots with the snapshot store:
+
+```go
+es.RegisterSnapshot(snapshotStore, &OrderSnapshot{})
+```
 
 ### 4. Loading and Saving Snapshots
 

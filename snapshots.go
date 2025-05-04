@@ -2,12 +2,15 @@ package es
 
 import (
 	"context"
+	"encoding/json"
 	"time"
-
-	"github.com/stackus/envelope"
 )
 
 type (
+	SnapshotPayload interface {
+		Kind() string
+	}
+
 	Snapshot[K comparable] struct {
 		AggregateID      K
 		AggregateType    string
@@ -18,8 +21,8 @@ type (
 	}
 
 	SnapshotAggregate[K comparable] interface {
-		CreateSnapshot() any
-		ApplySnapshot(snapshot any) error
+		CreateSnapshot() SnapshotPayload
+		ApplySnapshot(snapshot SnapshotPayload) error
 		Aggregate[K]
 	}
 
@@ -28,31 +31,30 @@ type (
 		Save(ctx context.Context, aggregate AggregateRoot[K], snapshot Snapshot[K], hooks SnapshotSaveHooks[K]) error
 	}
 
-	snapshotStore[K comparable] struct {
-		registry   envelope.Registry
-		eventStore AggregateStore[K]
-		repository SnapshotRepository[K]
-		strategy   SnapshotStrategy[K]
+	SnapshotStore[K comparable] struct {
+		eventStore       AggregateStore[K]
+		repository       SnapshotRepository[K]
+		strategy         SnapshotStrategy[K]
+		snapshotAppliers map[string]snapshotApplier[K]
 	}
 )
 
-var _ AggregateStore[any] = (*snapshotStore[any])(nil)
+var _ AggregateStore[any] = (*SnapshotStore[any])(nil)
 
 func NewSnapshotStore[K comparable](
-	registry envelope.Registry,
-	eventStore AggregateStore[K],
+	eventStore *EventStore[K],
 	repository SnapshotRepository[K],
 	strategy SnapshotStrategy[K],
-) AggregateStore[K] {
-	return &snapshotStore[K]{
-		registry:   registry,
-		eventStore: eventStore,
-		repository: repository,
-		strategy:   strategy,
+) *SnapshotStore[K] {
+	return &SnapshotStore[K]{
+		eventStore:       eventStore,
+		repository:       repository,
+		strategy:         strategy,
+		snapshotAppliers: make(map[string]snapshotApplier[K]),
 	}
 }
 
-func (s snapshotStore[K]) Load(ctx context.Context, aggregate AggregateRoot[K], hooks ...Hook[K]) error {
+func (s *SnapshotStore[K]) Load(ctx context.Context, aggregate AggregateRoot[K], hooks ...Hook[K]) error {
 	hook := EventsPreLoadHook[K](func(ctx context.Context, aggregate AggregateRoot[K]) error {
 		sa, ok := aggregate.(SnapshotAggregate[K])
 		if !ok {
@@ -64,13 +66,12 @@ func (s snapshotStore[K]) Load(ctx context.Context, aggregate AggregateRoot[K], 
 			return err
 		}
 
-		ssEnv, err := s.registry.Deserialize(snapshot.SnapshotData)
-		if err != nil {
-			return err
-		}
-		err = sa.ApplySnapshot(ssEnv.Payload())
-		if err != nil {
-			return err
+		if applier, ok := s.snapshotAppliers[snapshot.SnapshotType]; ok {
+			if err := applier.applyChange(snapshot, sa); err != nil {
+				return err
+			}
+		} else {
+			return ErrUnregisteredSnapshot(snapshot.SnapshotType)
 		}
 		sa.SetID(snapshot.AggregateID)
 		sa.SetVersion(snapshot.AggregateVersion)
@@ -81,7 +82,7 @@ func (s snapshotStore[K]) Load(ctx context.Context, aggregate AggregateRoot[K], 
 	return s.eventStore.Load(ctx, aggregate, append([]Hook[K]{hook}, hooks...)...)
 }
 
-func (s snapshotStore[K]) Save(ctx context.Context, aggregate AggregateRoot[K], hooks ...Hook[K]) error {
+func (s *SnapshotStore[K]) Save(ctx context.Context, aggregate AggregateRoot[K], hooks ...Hook[K]) error {
 	hook := EventsPostSaveHook[K](func(ctx context.Context, aggregate AggregateRoot[K], events []Event[K]) error {
 		sa, ok := aggregate.(SnapshotAggregate[K])
 		if !ok {
@@ -93,7 +94,7 @@ func (s snapshotStore[K]) Save(ctx context.Context, aggregate AggregateRoot[K], 
 		}
 
 		snapshot := sa.CreateSnapshot()
-		ssEnv, err := s.registry.Serialize(snapshot)
+		data, err := json.Marshal(snapshot)
 		if err != nil {
 			return err
 		}
@@ -102,11 +103,33 @@ func (s snapshotStore[K]) Save(ctx context.Context, aggregate AggregateRoot[K], 
 			AggregateID:      aggregate.AggregateID(),
 			AggregateType:    aggregate.AggregateType(),
 			AggregateVersion: aggregate.AggregateVersion() + len(events),
-			SnapshotType:     ssEnv.Key(),
-			SnapshotData:     ssEnv.Bytes(),
+			SnapshotType:     snapshot.Kind(),
+			SnapshotData:     data,
 			CreatedAt:        time.Now(),
 		}, Hooks[K](hooks))
 	})
 
 	return s.eventStore.Save(ctx, aggregate, append(hooks, hook)...)
+}
+
+func (s *SnapshotStore[K]) registerSnapshotApplier(snapshotType string, applier snapshotApplier[K]) {
+	s.snapshotAppliers[snapshotType] = applier
+}
+
+type snapshotApplier[K comparable] interface {
+	applyChange(snapshot *Snapshot[K], aggregate SnapshotAggregate[K]) error
+}
+
+type snapshotApplyWrapper[K comparable, T SnapshotPayload] struct{}
+
+func (a *snapshotApplyWrapper[K, T]) applyChange(snapshot *Snapshot[K], aggregate SnapshotAggregate[K]) error {
+	var payload T
+	if err := json.Unmarshal(snapshot.SnapshotData, &payload); err != nil {
+		return err
+	}
+	return aggregate.ApplySnapshot(payload)
+}
+
+func RegisterSnapshot[K comparable, T SnapshotPayload](snapshotStore *SnapshotStore[K], snapshot T) {
+	snapshotStore.registerSnapshotApplier(snapshot.Kind(), &snapshotApplyWrapper[K, T]{})
 }

@@ -4,14 +4,18 @@ import (
 	"fmt"
 )
 
+type ErrUnregisteredEvent string
+
 type ErrUnknownAggregateChangeType struct {
 	AggregateType string
-	Change        any
+	Change        EventPayload
 }
+
+type ErrUnregisteredSnapshot string
 
 type ErrUnknownAggregateSnapshotType struct {
 	AggregateType string
-	Snapshot      any
+	Snapshot      SnapshotPayload
 }
 
 type ErrAggregateVersionConflict struct {
@@ -20,14 +24,22 @@ type ErrAggregateVersionConflict struct {
 	AggregateVersion int
 }
 
+func (e ErrUnregisteredEvent) Error() string {
+	return fmt.Sprintf("unregistered event: %s", string(e))
+}
+
 func (e ErrAggregateVersionConflict) Error() string {
 	return fmt.Sprintf("aggregate version conflict: %s:%s version:%d", e.AggregateType, e.AggregateID, e.AggregateVersion)
 }
 
 func (e ErrUnknownAggregateChangeType) Error() string {
-	return fmt.Sprintf("unknown aggregate change type: %s:%T", e.AggregateType, e.Change)
+	return fmt.Sprintf("unknown aggregate change type: %s:%s", e.AggregateType, e.Change.Kind())
+}
+
+func (e ErrUnregisteredSnapshot) Error() string {
+	return fmt.Sprintf("unregistered snapshot: %s", string(e))
 }
 
 func (e ErrUnknownAggregateSnapshotType) Error() string {
-	return fmt.Sprintf("unknown aggregate snapshot type: %s:%T", e.AggregateType, e.Snapshot)
+	return fmt.Sprintf("unknown aggregate snapshot type: %s:%s", e.AggregateType, e.Snapshot.Kind())
 }

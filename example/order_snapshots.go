@@ -9,3 +9,5 @@ type OrderSnapshot struct {
 	Items      []Item
 	Shipping   ShippingAddress
 }
+
+func (OrderSnapshot) Kind() string { return "OrderSnapshot" }
