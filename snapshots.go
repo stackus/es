@@ -36,6 +36,7 @@ type (
 		repository       SnapshotRepository[K]
 		strategy         SnapshotStrategy[K]
 		snapshotAppliers map[string]snapshotApplier[K]
+		snapshotHooks    []Hook[K]
 	}
 )
 
@@ -45,12 +46,14 @@ func NewSnapshotStore[K comparable](
 	eventStore *EventStore[K],
 	repository SnapshotRepository[K],
 	strategy SnapshotStrategy[K],
+	hooks ...Hook[K],
 ) *SnapshotStore[K] {
 	return &SnapshotStore[K]{
 		eventStore:       eventStore,
 		repository:       repository,
 		strategy:         strategy,
 		snapshotAppliers: make(map[string]snapshotApplier[K]),
+		snapshotHooks:    hooks,
 	}
 }
 
@@ -61,7 +64,7 @@ func (s *SnapshotStore[K]) Load(ctx context.Context, aggregate AggregateRoot[K],
 			return nil
 		}
 
-		snapshot, err := s.repository.Load(ctx, aggregate, Hooks[K](hooks))
+		snapshot, err := s.repository.Load(ctx, aggregate, Hooks[K](append(hooks, s.snapshotHooks...)))
 		if err != nil || snapshot == nil {
 			return err
 		}
@@ -106,7 +109,7 @@ func (s *SnapshotStore[K]) Save(ctx context.Context, aggregate AggregateRoot[K],
 			SnapshotType:     snapshot.Kind(),
 			SnapshotData:     data,
 			CreatedAt:        time.Now(),
-		}, Hooks[K](hooks))
+		}, Hooks[K](append(hooks, s.snapshotHooks...)))
 	})
 
 	return s.eventStore.Save(ctx, aggregate, append(hooks, hook)...)
@@ -119,6 +122,7 @@ func (s *SnapshotStore[K]) WithRepository(repository SnapshotRepository[K]) *Sna
 		repository:       repository,
 		strategy:         s.strategy,
 		snapshotAppliers: s.snapshotAppliers,
+		snapshotHooks:    s.snapshotHooks,
 	}
 }
 
@@ -129,6 +133,7 @@ func (s *SnapshotStore[K]) WithEventStore(eventStore *EventStore[K]) *SnapshotSt
 		repository:       s.repository,
 		strategy:         s.strategy,
 		snapshotAppliers: s.snapshotAppliers,
+		snapshotHooks:    s.snapshotHooks,
 	}
 }
 

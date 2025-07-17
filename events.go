@@ -28,6 +28,7 @@ type (
 	EventStore[K comparable] struct {
 		repository    EventRepository[K]
 		eventAppliers map[string]eventApplier[K]
+		eventHooks    []Hook[K]
 	}
 )
 
@@ -35,15 +36,17 @@ var _ AggregateStore[any] = (*EventStore[any])(nil)
 
 func NewEventStore[K comparable](
 	repository EventRepository[K],
+	hooks ...Hook[K],
 ) *EventStore[K] {
 	return &EventStore[K]{
 		repository:    repository,
 		eventAppliers: make(map[string]eventApplier[K]),
+		eventHooks:    hooks,
 	}
 }
 
 func (s *EventStore[K]) Load(ctx context.Context, aggregate AggregateRoot[K], hooks ...Hook[K]) error {
-	events, err := s.repository.Load(ctx, aggregate, Hooks[K](hooks))
+	events, err := s.repository.Load(ctx, aggregate, Hooks[K](append(hooks, s.eventHooks...)))
 	if err != nil {
 		return err
 	}
@@ -89,7 +92,7 @@ func (s *EventStore[K]) Save(ctx context.Context, aggregate AggregateRoot[K], ho
 		})
 	}
 
-	if err := s.repository.Save(ctx, aggregate, events, Hooks[K](hooks)); err != nil {
+	if err := s.repository.Save(ctx, aggregate, events, Hooks[K](append(hooks, s.eventHooks...))); err != nil {
 		return err
 	}
 
@@ -103,6 +106,7 @@ func (s *EventStore[K]) WithRepository(repository EventRepository[K]) *EventStor
 	return &EventStore[K]{
 		repository:    repository,
 		eventAppliers: s.eventAppliers,
+		eventHooks:    s.eventHooks,
 	}
 }
 
