@@ -17,13 +17,21 @@ func main() {
 	var store es.AggregateStore[uuid.UUID]
 	eventStore := es.NewEventStore[uuid.UUID](memory.NewEventRepository[uuid.UUID]())
 
-	// Register the events with the event store
+	// Register the events with the event store directly (won't use reflection)
 	es.RegisterEvent(eventStore, &OrderCreated{})
 	es.RegisterEvent(eventStore, &OrderItemAdded{})
-	es.RegisterEvent(eventStore, &OrderItemRemoved{})
-	es.RegisterEvent(eventStore, &OrderItemQuantityIncreased{})
-	es.RegisterEvent(eventStore, &OrderItemQuantityDecreased{})
-	es.RegisterEvent(eventStore, &OrderShippingAddressSet{})
+
+	// Register the events with the event store using a slice of EventPayloads (will use reflection)
+	events := []es.EventPayload{
+		&OrderItemRemoved{}, // in a slice it won't matter if you use a pointer or value type
+		&OrderItemQuantityIncreased{},
+		OrderItemQuantityDecreased{},
+		OrderShippingAddressSet{},
+	}
+
+	for _, event := range events {
+		es.RegisterEvent(eventStore, event)
+	}
 
 	snapshotStore := es.NewSnapshotStore[uuid.UUID](
 		eventStore,

@@ -3,6 +3,7 @@ package es
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"time"
 )
 
@@ -121,9 +122,9 @@ type eventApplier[K comparable] interface {
 	applyChange(event Event[K], aggregate AggregateRoot[K]) error
 }
 
-type eventApplyWrapper[K comparable, T EventPayload] struct{}
+type eventTypedWrapper[K comparable, T EventPayload] struct{}
 
-func (a *eventApplyWrapper[K, T]) applyChange(event Event[K], aggregate AggregateRoot[K]) error {
+func (a *eventTypedWrapper[K, T]) applyChange(event Event[K], aggregate AggregateRoot[K]) error {
 	var payload T
 	if err := json.Unmarshal(event.EventData, &payload); err != nil {
 		return err
@@ -131,6 +132,27 @@ func (a *eventApplyWrapper[K, T]) applyChange(event Event[K], aggregate Aggregat
 	return aggregate.TrackChange(aggregate, payload)
 }
 
+type eventReflectWrapper[K comparable] struct {
+	v reflect.Value
+}
+
+func (w *eventReflectWrapper[K]) applyChange(event Event[K], aggregate AggregateRoot[K]) error {
+	payload := w.v.Interface().(EventPayload)
+	if err := json.Unmarshal(event.EventData, &payload); err != nil {
+		return err
+	}
+	return aggregate.TrackChange(aggregate, payload)
+}
+
 func RegisterEvent[K comparable, T EventPayload](eventStore *EventStore[K], event T) {
-	eventStore.registerEventApplier(event.Kind(), &eventApplyWrapper[K, T]{})
+	if reflect.TypeOf((*T)(nil)).Elem().Kind() == reflect.Interface {
+		eventType := reflect.TypeOf(event)
+		if eventType.Kind() == reflect.Ptr {
+			eventType = eventType.Elem()
+		}
+		eventStore.registerEventApplier(event.Kind(), &eventReflectWrapper[K]{reflect.New(eventType)})
+	} else {
+		eventStore.registerEventApplier(event.Kind(), &eventTypedWrapper[K, T]{})
+		return
+	}
 }
